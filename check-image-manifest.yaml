@@ -1,0 +1,30 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: inspect-manifest
+spec:
+  params:
+  - name: buildahVersion
+    type: string
+  - name: outputContainerImage
+    type: string
+  steps:
+  - computeResources: {}
+    env:
+    - name: TARGET_IMAGE
+      value: $(params.outputContainerImage)
+    image: quay.io/containers/buildah:$(params.buildahVersion)
+    name: buildah
+    script: "#!/bin/bash\n\nset -Eeuo pipefail\n\nfunction inspect () {\n  echo \"=========================================================\"\n
+      \ echo \" buildah manifest inspect $TARGET_IMAGE\"\n  echo \"=========================================================\"\n
+      \ echo\n\n  buildah manifest inspect $TARGET_IMAGE \n  echo\n}\n\n\ninspect
+      \n\nexit 0      \n"
+    securityContext:
+      capabilities:
+        add:
+        - SYS_ADMIN
+      privileged: true
+    workingDir: /src
+  workspaces:
+  - mountPath: /src
+    name: source
