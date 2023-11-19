@@ -1,0 +1,54 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: buildah-manifest
+spec:
+  params:
+  - description: Reference of the image buildah will produce.
+    name: IMAGE
+    type: string
+  - description: Set buildah storage driver
+    name: MANIFEST_NAME
+    type: string
+  - description: Kubernetes secrets contain image push username and password
+    name: IMAGE_PUSH_SECRET_NAME
+    type: string
+  steps:
+  - computeResources: {}
+    image: quay.io/buildah/stable:latest
+    name: build
+    script: |
+      buildah manifest create $(params.MANIFEST_NAME) $(params.IMAGE)-amd64 $(params.IMAGE)-s390x
+    securityContext:
+      privileged: true
+    volumeMounts:
+    - mountPath: /var/lib/containers
+      name: varlibcontainers
+    workingDir: $(workspaces.source.path)
+  - computeResources: {}
+    env:
+    - name: USERNAME
+      valueFrom:
+        secretKeyRef:
+          key: username
+          name: $(params.IMAGE_PUSH_SECRET_NAME)
+    - name: PASSWORD
+      valueFrom:
+        secretKeyRef:
+          key: password
+          name: $(params.IMAGE_PUSH_SECRET_NAME)
+    image: quay.io/buildah/stable:latest
+    name: push
+    script: "buildah manifest push --creds ${USERNAME}:${PASSWORD} $(params.MANIFEST_NAME)
+      --all \n"
+    securityContext:
+      privileged: true
+    volumeMounts:
+    - mountPath: /var/lib/containers
+      name: varlibcontainers
+    workingDir: $(workspaces.source.path)
+  volumes:
+  - emptyDir: {}
+    name: varlibcontainers
+  workspaces:
+  - name: source
